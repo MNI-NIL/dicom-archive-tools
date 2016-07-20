@@ -36,7 +36,7 @@ $mail_user      = "yourname\@example.com";      # who will be notified
 $get_dicom_info = "/PATH/TO/get_dicom_info.pl"; # path to get_dicom_info.pl
 $horizontalPics = 1;
 $no_nii         = 0;                            # 0=create nifti files, 1=don't create nifti files
-$regex_pattern  = '([^_]+)_(\d+)_([^_]+)'       # regular expression to parse PatientName or PatientID
+$PatientID_regex  = '([^_]+)_(\d+)_([^_]+)'       # regular expression to parse PatientName or PatientID
 
 
 # if converter is set to dcm2mnc, the c-version of dcm2mnc will be used. If however you want
@@ -108,7 +108,7 @@ sub getSubjectIDs {
 
      # If patient match PSCID_DCCID_VisitLabel
      # Determine PSCID, DCCID and visitLabel based on patient name
-    } elsif ($identifier =~ /$regex_pattern/i) {
+    } elsif ($identifier =~ /$PatientID_regex/i) {
 
         $subjectID{'PSCID'}         = NeuroDB::MRI::my_trim($1);
         $subjectID{'CandID'}        = NeuroDB::MRI::my_trim($2);
