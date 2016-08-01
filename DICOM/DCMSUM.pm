@@ -138,15 +138,16 @@ QUERY
     
     (my $common_query_part = <<QUERY) =~ s/\n/ /gm;  
       tarchive SET  
-        DicomArchiveID = ?,       PatientName = ?,
-        PatientID = ?,            PatientDoB = ?,
-        PatientGender = ?,        DateAcquired = ?,
-        ScannerManufacturer = ?,  ScannerModel = ?,
-        ScannerSerialNumber = ?,  ScannerSoftwareVersion = ?,
-        CenterName = ?,           AcquisitionCount = ?,
-        NonDicomFileCount = ?,    DicomFileCount = ?,
-        CreatingUser = ?,         SourceLocation = ?,
-        sumTypeVersion = ?,       AcquisitionMetadata = ?,
+        DicomArchiveID = ?,         PatientName = ?,
+        PatientID = ?,              PatientDoB = ?,
+        PatientGender = ?,          DateAcquired = ?,
+        ScannerManufacturer = ?,    ScannerModel = ?,
+        ScannerSerialNumber = ?,    ScannerSoftwareVersion = ?,
+        CenterName = ?,             AcquisitionCount = ?,
+        NonDicomFileCount = ?,      DicomFileCount = ?,
+        CreatingUser = ?,           SourceLocation = ?,
+        sumTypeVersion = ?,         AcquisitionMetadata = ?,
+        ReferringPhysicianName = ?, PerformingPhysicianName = ?,
         DateLastArchived = NOW()
 QUERY
     my @values = 
@@ -158,7 +159,8 @@ QUERY
        $self->{header}->{scanner_serial}, $self->{header}->{software},      
        $self->{header}->{institution},    $self->{acquisition_count},          
        $self->{nondcmcount},              $self->{dcmcount},                  
-       $self->{user},                     $self->{dcmdir},                     
+       $self->{user},                     $self->{dcmdir},
+       $self->{referring_physician},      $self->{performing_physician},                  
        $self->{sumTypeVersion},           $metacontent   
       );
     
@@ -531,26 +533,28 @@ sub read_dicom_data {
 
     # see if the file was really dicom
     if($fileIsDicom) {
-	$studyUID           = trimwhitespace($dicom->value('0020','000D'));  # element 0 0 is study uid
-	$series             = trimwhitespace($dicom->value('0020','0011'));  # element 0 1 is series
-	$echo               = trimwhitespace($dicom->value('0018','0086'));  # element 0 2 is echo number
-	$image              = trimwhitespace($dicom->value('0020','0013'));  # element 0 3 is image number
+	$studyUID            = trimwhitespace($dicom->value('0020','000D'));  # element 0 0 is study uid
+	$series              = trimwhitespace($dicom->value('0020','0011'));  # element 0 1 is series
+	$echo                = trimwhitespace($dicom->value('0018','0086'));  # element 0 2 is echo number
+	$image               = trimwhitespace($dicom->value('0020','0013'));  # element 0 3 is image number
 	                                                                     # element 0 4 is the file itself  
-	$tr                 = trimwhitespace($dicom->value('0018','0080'));  # element 0 5 is repetition time  
-	$te                 = trimwhitespace($dicom->value('0018','0081'));  # element 0 6 is echo time
-	$ti                 = trimwhitespace($dicom->value('0018','0082'));  # element 0 7 is inversion time
-	$date               = trimwhitespace($dicom->value('0008','0020'));  # element 0 8 is date of study
-	$pname              = trimwhitespace($dicom->value('0010','0010'));  # element 0 9 is patient name
-	$pdob               = trimwhitespace($dicom->value('0010','0030'));  # element 0 10 is patitent date of birth 
-	$pid                = trimwhitespace($dicom->value('0010','0020'));  # element 0 11 is patient ID
-	$series_description = trimwhitespace($dicom->value('0008','103E'));  # element 0 12 is series description
-	$sex                = trimwhitespace($dicom->value('0010','0040'));  # element 0 13 -attvalue 0010 0040    patient sex
-	$scanner            = trimwhitespace($dicom->value('0008','1090'));  # element 0 14 -attvalue 0008 1090    scanner model
-	$software           = trimwhitespace($dicom->value('0018','1020'));  # element 0 15 -attvalue 0018 1020    software version
-	$institution        = trimwhitespace($dicom->value('0008','0080'));  # element 0 16 -attvalue 0008 0080    institution
-	$sequence           = trimwhitespace($dicom->value('0018','0024'));  # element 0 17 -attvalue  0018 0024   sequence name
-	$slice_thickness    = trimwhitespace($dicom->value('0018','0050'));  # element 0 18 slice_thickness
-	$phase_encoding     = trimwhitespace($dicom->value('0018','1312'));  # element 0 19 phase encoding
+	$tr                  = trimwhitespace($dicom->value('0018','0080'));  # element 0 5 is repetition time  
+	$te                  = trimwhitespace($dicom->value('0018','0081'));  # element 0 6 is echo time
+	$ti                  = trimwhitespace($dicom->value('0018','0082'));  # element 0 7 is inversion time
+	$date                = trimwhitespace($dicom->value('0008','0020'));  # element 0 8 is date of study
+	$pname               = trimwhitespace($dicom->value('0010','0010'));  # element 0 9 is patient name
+	$pdob                = trimwhitespace($dicom->value('0010','0030'));  # element 0 10 is patitent date of birth 
+	$pid                 = trimwhitespace($dicom->value('0010','0020'));  # element 0 11 is patient ID
+	$series_description  = trimwhitespace($dicom->value('0008','103E'));  # element 0 12 is series description
+	$sex                 = trimwhitespace($dicom->value('0010','0040'));  # element 0 13 -attvalue 0010 0040    patient sex
+	$scanner             = trimwhitespace($dicom->value('0008','1090'));  # element 0 14 -attvalue 0008 1090    scanner model
+	$software            = trimwhitespace($dicom->value('0018','1020'));  # element 0 15 -attvalue 0018 1020    software version
+	$institution         = trimwhitespace($dicom->value('0008','0080'));  # element 0 16 -attvalue 0008 0080    institution
+	$sequence            = trimwhitespace($dicom->value('0018','0024'));  # element 0 17 -attvalue  0018 0024   sequence name
+	$slice_thickness     = trimwhitespace($dicom->value('0018','0050'));  # element 0 18 slice_thickness
+	$phase_encoding      = trimwhitespace($dicom->value('0018','1312'));  # element 0 19 phase encoding
+        $referring_physician  = trimwhitespace($dicom->value('0008','0090'));  # element 0 20 referring physician
+        $performing_physician = trimwhitespace($dicom->value('0008','1050'));  # element 0 21 performing physician (researcher)
 
     # these have been added only for tarchiveLoader functionality
     $manufacturer       = trimwhitespace($dicom->value('0008','0070'));  # element 0 22  scanner manufacturer
@@ -567,13 +571,13 @@ sub read_dicom_data {
     $ti = &Math::Round::nearest(0.01, $ti*1) unless (!defined($ti) || ($ti eq ""));
     $slice_thickness = &Math::Round::nearest(0.01, $slice_thickness*1) unless (!defined($slice_thickness) || ($slice_thickness eq ""));
     
-    return  [ $studyUID,           $series,      $echo,            $image, 
-              $file,               $tr,          $te,              $ti,   
-              $date,               $pname,       $pdob,            $pid,
-              $series_description, $sex,         $scanner,         $software, 
-              $institution,        $sequence,    $slice_thickness, $phase_encoding,
-              $md5,                $fileIsDicom, $manufacturer,    $scanner_serial,
-              $seriesUID,          $modality
+    return  [ $studyUID,           $series,      $echo,                $image, 
+              $file,               $tr,          $te,                  $ti,   
+              $date,               $pname,       $pdob,                $pid,
+              $series_description, $sex,         $scanner,             $software, 
+              $institution,        $sequence,    $slice_thickness,     $phase_encoding,
+              $md5,                $fileIsDicom, $manufacturer,        $scanner_serial,
+              $seriesUID,          $modality,    $referring_physician, $performing_physician
             ];
 
 }
@@ -592,15 +596,17 @@ sub fill_header {
     while(! @{$head_info[$i]}[21]) {
 	$i++;
     }
-    $self->{header}->{pname}       = $head_info[$i]->[9];
-    $self->{header}->{pid}         = $head_info[$i]->[11];
-    $self->{header}->{birthdate}   = &date_format($head_info[$i]->[ 10]);
-    $self->{header}->{scandate}    = &date_format($head_info[$i]->[  8]);
-    $self->{header}->{sex}         = $head_info[$i]->[ 13 ];
-    $self->{header}->{scanner}     = $head_info[$i]->[ 14 ];
-    $self->{header}->{software}    = $head_info[$i]->[ 15 ];
-    $self->{header}->{institution} = $head_info[$i]->[ 16 ];
-    $self->{header}->{modality}    = $head_info[$i]->[ 25 ];
+    $self->{header}->{pname}                = $head_info[$i]->[9];
+    $self->{header}->{pid}                  = $head_info[$i]->[11];
+    $self->{header}->{birthdate}            = &date_format($head_info[$i]->[ 10]);
+    $self->{header}->{scandate}             = &date_format($head_info[$i]->[  8]);
+    $self->{header}->{sex}                  = $head_info[$i]->[ 13 ];
+    $self->{header}->{scanner}              = $head_info[$i]->[ 14 ];
+    $self->{header}->{software}             = $head_info[$i]->[ 15 ];
+    $self->{header}->{institution}          = $head_info[$i]->[ 16 ];
+    $self->{header}->{modality}             = $head_info[$i]->[ 25 ];
+    $self->{header}->{referring_physician}  = $head_info[$i]->[ 20 ];
+    $self->{header}->{performing_physician} = $head_info[$i]->[ 21 ];
 
 # these have been added for tarchiveLoader
     $self->{header}->{manufacturer}       = $head_info[$i]->[ 22 ];
