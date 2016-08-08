@@ -160,10 +160,10 @@ QUERY
        $self->{header}->{institution},    $self->{acquisition_count},          
        $self->{nondcmcount},              $self->{dcmcount},                  
        $self->{user},                     $self->{dcmdir},
-       $self->{referring_physician},      $self->{performing_physician},                  
-       $self->{sumTypeVersion},           $metacontent   
+       $self->{sumTypeVersion},           $metacontent,
+       $self->{referring_physician},      $self->{performing_physician}   
       );
-    
+  
     # this only applies if you are archiving your data
     if ($Archivemd5) { 
        ($common_query_part = <<QUERY) =~ s/\n/ /gm; 
@@ -198,6 +198,7 @@ QUERY
         push(@values, $self->{studyuid});
     }
     
+
     $sth     = $dbh->prepare($query);
     $success = $sth->execute(@values);
 #FIXME
@@ -222,7 +223,7 @@ QUERY
         my @row = $sth->fetchrow_array();
         $tarchiveID = $row[0];
     }
-    
+ 
     # if update, nuke series and files records then reinsert them
     if($update) {
         (my $delete_series = <<QUERY) =~ s/\n/ /gm;
@@ -242,7 +243,7 @@ QUERY
         $sth_series->execute($tarchiveID);
         $sth_files->execute($tarchiveID);
     }
-
+    
     # now create the tarchive_series records
     (my $query = <<QUERY) =~ s/\n/ /gm;
       INSERT INTO 
@@ -261,6 +262,7 @@ QUERY
            ?,             ?,              ?
           )
 QUERY
+
     my $insert_series = $dbh->prepare($query);
     foreach my $acq (@{$self->{acqu_List}}) {
 
@@ -296,7 +298,7 @@ QUERY
             $insert_series->execute(@values);
         }
     }
-
+ 
     # now create the tarchive_files records
     (my $insert_query = <<QUERY) =~ s/\n/ /gm;
       INSERT INTO 
@@ -321,7 +323,7 @@ QUERY
         $filename =~ s/^${dcmdirRoot}\///;
         $file->[2] = undef if($file->[2] eq '');
         my @values;
-        if($file->[21] && $file->[25] eq 'MR') { # file is dicom and an MRI scan
+        if($file->[21] && $file->[25] eq 'MR') { # file is dicom and an MRI scan 
             @values = 
               (
                $tarchiveID, $file->[1],  $file->[3], 
@@ -495,6 +497,7 @@ sub content_list {
     my ($self, $dcmdir) = @_;
     my @info = (); 
     my $find_handler = sub { if(-f $File::Find::name) { push @info, &read_dicom_data($File::Find::name); } };
+    print(find($find_handler,$referring_physician));
     find($find_handler, $dcmdir);
     my @sorted_info = sort { ($b->[21] <=>  $a->[21])
 			  || ($a->[1]  <=>  $b->[1])
@@ -523,12 +526,12 @@ sub read_dicom_data {
     my $studyUID           = trimwhitespace($dicom->value('0020','000D'));  # element 0 0 is study uid
     if($studyUID eq '') {$fileIsDicom = 0;}                              # element 0 21 is whether file is Dicom or not
 
-    my ($series,          $echo,           $image,              $tr,    
-        $te,              $ti,             $date,               $pname, 
-        $pdob,            $pid,            $series_description, $sex,
-        $scanner,         $software,       $institution,        $sequence,       
-        $slice_thickness, $phase_encoding, $manufacturer,       $scanner_serial, 
-        $seriesUID,       $modality
+    my ($series,          $echo,           $image,               $tr,    
+        $te,              $ti,             $date,                $pname, 
+        $pdob,            $pid,            $series_description,  $sex,
+        $scanner,         $software,       $institution,         $sequence,       
+        $slice_thickness, $phase_encoding, $referring_physician, $performing_physician,
+        $manufacturer,    $scanner_serial, $seriesUID,           $modality
        );
 
     # see if the file was really dicom
@@ -553,8 +556,8 @@ sub read_dicom_data {
 	$sequence            = trimwhitespace($dicom->value('0018','0024'));  # element 0 17 -attvalue  0018 0024   sequence name
 	$slice_thickness     = trimwhitespace($dicom->value('0018','0050'));  # element 0 18 slice_thickness
 	$phase_encoding      = trimwhitespace($dicom->value('0018','1312'));  # element 0 19 phase encoding
-        $referring_physician  = trimwhitespace($dicom->value('0008','0090'));  # element 0 20 referring physician
-        $performing_physician = trimwhitespace($dicom->value('0008','1050'));  # element 0 21 performing physician (researcher)
+        $referring_physician  = trimwhitespace($dicom->value('0008','0090'));  # element 0 26 referring physician
+        $performing_physician = trimwhitespace($dicom->value('0008','1050'));  # element 0 27 performing physician (researcher)
 
     # these have been added only for tarchiveLoader functionality
     $manufacturer       = trimwhitespace($dicom->value('0008','0070'));  # element 0 22  scanner manufacturer
@@ -571,13 +574,13 @@ sub read_dicom_data {
     $ti = &Math::Round::nearest(0.01, $ti*1) unless (!defined($ti) || ($ti eq ""));
     $slice_thickness = &Math::Round::nearest(0.01, $slice_thickness*1) unless (!defined($slice_thickness) || ($slice_thickness eq ""));
     
-    return  [ $studyUID,           $series,      $echo,                $image, 
-              $file,               $tr,          $te,                  $ti,   
-              $date,               $pname,       $pdob,                $pid,
-              $series_description, $sex,         $scanner,             $software, 
-              $institution,        $sequence,    $slice_thickness,     $phase_encoding,
-              $md5,                $fileIsDicom, $manufacturer,        $scanner_serial,
-              $seriesUID,          $modality,    $referring_physician, $performing_physician
+    return  [ $studyUID,            $series,               $echo,            $image, 
+              $file,                $tr,                   $te,              $ti,   
+              $date,                $pname,                $pdob,            $pid,
+              $series_description,  $sex,                  $scanner,         $software, 
+              $institution,         $sequence,             $slice_thickness, $phase_encoding,
+              $referring_physician, $performing_physician, $md5,             $fileIsDicom,
+              $manufacturer,        $scanner_serial,       $seriesUID,       $modality
             ];
 
 }
@@ -605,8 +608,8 @@ sub fill_header {
     $self->{header}->{software}             = $head_info[$i]->[ 15 ];
     $self->{header}->{institution}          = $head_info[$i]->[ 16 ];
     $self->{header}->{modality}             = $head_info[$i]->[ 25 ];
-    $self->{header}->{referring_physician}  = $head_info[$i]->[ 20 ];
-    $self->{header}->{performing_physician} = $head_info[$i]->[ 21 ];
+    $self->{header}->{referring_physician}  = $head_info[$i]->[ 26 ];
+    $self->{header}->{performing_physician} = $head_info[$i]->[ 27 ];
 
 # these have been added for tarchiveLoader
     $self->{header}->{manufacturer}       = $head_info[$i]->[ 22 ];
