@@ -63,7 +63,7 @@ sub new {
     $self->{totalcount}        = $self->file_count();
     $self->{nondcmcount}       = $self->{totalcount} - $self->{dcmcount};
     $self->{acquisition_count} = $self->acquistion_count();  
-    $self->{user}              = $ENV{'USER'};
+    $self->{user}              = $ENV{'USER'};  
 
     return $self;
 }
@@ -135,7 +135,7 @@ QUERY
     # get acquisition metadata
     my $sfile = "$self->{tmpdir}/$meta.meta";
     my $metacontent = &read_file($sfile);
-    
+  
     (my $common_query_part = <<QUERY) =~ s/\n/ /gm;  
       tarchive SET  
         DicomArchiveID = ?,         PatientName = ?,
@@ -152,16 +152,16 @@ QUERY
 QUERY
     my @values = 
       (
-       $self->{studyuid},                 $self->{header}->{pname},           
-       $self->{header}->{pid},            $self->{header}->{birthdate},      
-       $self->{header}->{sex},            $self->{header}->{scandate},       
-       $self->{header}->{manufacturer},   $self->{header}->{scanner},          
-       $self->{header}->{scanner_serial}, $self->{header}->{software},      
-       $self->{header}->{institution},    $self->{acquisition_count},          
-       $self->{nondcmcount},              $self->{dcmcount},                  
-       $self->{user},                     $self->{dcmdir},
-       $self->{sumTypeVersion},           $metacontent,
-       $self->{referring_physician},      $self->{performing_physician}   
+       $self->{studyuid},                        $self->{header}->{pname},           
+       $self->{header}->{pid},                   $self->{header}->{birthdate},      
+       $self->{header}->{sex},                   $self->{header}->{scandate},       
+       $self->{header}->{manufacturer},          $self->{header}->{scanner},          
+       $self->{header}->{scanner_serial},        $self->{header}->{software},      
+       $self->{header}->{institution},           $self->{acquisition_count},          
+       $self->{nondcmcount},                     $self->{dcmcount},                  
+       $self->{user},                            $self->{dcmdir},
+       $self->{sumTypeVersion},                  $metacontent,
+       $self->{header}->{referring_physician},   $self->{header}->{performing_physician}   
       );
   
     # this only applies if you are archiving your data
@@ -497,8 +497,8 @@ sub content_list {
     my ($self, $dcmdir) = @_;
     my @info = (); 
     my $find_handler = sub { if(-f $File::Find::name) { push @info, &read_dicom_data($File::Find::name); } };
-    print(find($find_handler,$referring_physician));
     find($find_handler, $dcmdir);
+  
     my @sorted_info = sort { ($b->[21] <=>  $a->[21])
 			  || ($a->[1]  <=>  $b->[1])
 			  || ($a->[5]  <=>  $b->[5])
@@ -508,6 +508,8 @@ sub content_list {
 			    } @info;
     
     return @sorted_info;
+
+
 }
 
 =pod
@@ -574,13 +576,13 @@ sub read_dicom_data {
     $ti = &Math::Round::nearest(0.01, $ti*1) unless (!defined($ti) || ($ti eq ""));
     $slice_thickness = &Math::Round::nearest(0.01, $slice_thickness*1) unless (!defined($slice_thickness) || ($slice_thickness eq ""));
     
-    return  [ $studyUID,            $series,               $echo,            $image, 
-              $file,                $tr,                   $te,              $ti,   
-              $date,                $pname,                $pdob,            $pid,
-              $series_description,  $sex,                  $scanner,         $software, 
-              $institution,         $sequence,             $slice_thickness, $phase_encoding,
-              $referring_physician, $performing_physician, $md5,             $fileIsDicom,
-              $manufacturer,        $scanner_serial,       $seriesUID,       $modality
+    return  [ $studyUID,            $series,       $echo,                $image, 
+              $file,                $tr,           $te,                  $ti,   
+              $date,                $pname,        $pdob,                $pid,
+              $series_description,  $sex,          $scanner,             $software, 
+              $institution,         $sequence,     $slice_thickness,     $phase_encoding,
+              $md5,                 $fileIsDicom,  $manufacturer,        $scanner_serial,
+              $seriesUID,           $modality,     $referring_physician, $performing_physician,
             ];
 
 }
@@ -689,6 +691,11 @@ sub format_head {
                                 $self->{header}->{institution},
 * Modality                 :    @<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
                                 $self->{header}->{modality}
+* PI                       :    @<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+                                $self->{header}->{referring_physician}
+* Researcher               :    @<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+                                $self->{header}->{performing_physician}
+
 </STUDY_INFO>
 .
 }
