@@ -29,14 +29,14 @@
 =cut
 
 
-$data_dir       = '/PATH/TO/DATA/location';     # where the data goes
-$bin_dir        = '/PATH/TO/BIN/location';      # where the imaging scripts go
-$prefix         = "project";                    # study prefix or study name
-$mail_user      = "yourname\@example.com";      # who will be notified
-$get_dicom_info = "/PATH/TO/get_dicom_info.pl"; # path to get_dicom_info.pl
-$horizontalPics = 1;
-$no_nii         = 0;                            # 0=create nifti files, 1=don't create nifti files
-$PatientID_regex  = '([^_]+)_(\d+)_([^_]+)'       # regular expression to parse PatientName or PatientID
+$data_dir        = '/PATH/TO/DATA/location';     # where the data goes
+$bin_dir         = '/PATH/TO/BIN/location';      # where the imaging scripts go
+$prefix          = "project";                    # study prefix or study name
+$mail_user       = "yourname\@example.com";      # who will be notified
+$get_dicom_info  = "/PATH/TO/get_dicom_info.pl"; # path to get_dicom_info.pl
+$horizontalPics  = 1;
+$no_nii          = 0;                            # 0=create nifti files, 1=don't create nifti files
+$PatientID_regex = '([^_]+)_(\d+)_([^_]+)|(lego_phantom)|(living_phantom)'  # regular expression to parse PatientName or PatientID
 
 
 # if converter is set to dcm2mnc, the c-version of dcm2mnc will be used. If however you want
@@ -83,10 +83,17 @@ $QCed2_step   =   'INTERLACE_outputDWIFileNameSuffix';
 # -----------------------------------------------------------------------------------------------
 =cut
 
-sub getIncomingDir {
-    my $site = shift;
-    return $tarchiveLibraryDir;
+### This gets the modalities that SNR is to be computed on
+## Filename base usually contains the modality
+## So compute SNR on the 3-D modalities; most commonly t1, t2, flair, and pd
+sub getSNRModalities {
+    my $base = shift;
+    if ($base =~ /t1/i or $base =~ /t2/i or $base =~ /flair/i or $base =~ /pd/i) {
+        return 1;
+    }
+    return 0;
 }
+
 # extracts the subject and timepoint identifiers from the patient name
 # assumes identifers are stored as <PSCID>_<DCCID>_<visit> in PatientName field, where <visit> is 3 digits.
 sub getSubjectIDs {
