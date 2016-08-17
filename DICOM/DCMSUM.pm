@@ -5,7 +5,7 @@
 #@EXPORT_OK  : none
 #@EXPORT_TAGS: none
 #@USES       : DICOM::DICOM
-#@REQUIRES   : 
+#@REQUIRES   :
 #@VERSION    : $Id: DCMSUM.pm 9 2007-12-18 22:26:00Z jharlap $
 #@CREATED    : 2006/03/18, J-Sebastian Muehlboeck
 #@MODIFIED   : sebas
@@ -24,7 +24,7 @@ use Digest::MD5;
 # more specific stuff
 use DICOM::DICOM;
 
-# The constructor 
+# The constructor
 sub new {
     my $proto = shift;
     my $class = ref($proto) || $proto;
@@ -37,38 +37,38 @@ sub new {
 # summary Type VERSION: This should be changed, if - and only if the way the summary is created changes!!
     $self->{sumTypeVersion} = 1;
 
-# set up some basic stuff    
+# set up some basic stuff
     $self->{dcmdir}     = $dcm_dir;                    # the dcm source dir
-    $self->{tmpdir}     = $tmp_dir;                    # tmp dir 
+    $self->{tmpdir}     = $tmp_dir;                    # tmp dir
     $self->{metaname}   = basename($self->{dcmdir});   # the name for the .meta file
-    
+
     $self->{archivedir} = undef;
 # get an array describing ALL files
-    $self->{dcminfo}   = [$self->content_list($self->{dcmdir})]; 
+    $self->{dcminfo}   = [$self->content_list($self->{dcmdir})];
 ### make sure that there is at least one dicom file in target directory
-    $self->{dcmcount}          = $self->dcm_count();  
+    $self->{dcmcount}          = $self->dcm_count();
 # studyuid if there is only one study in source
     $self->{studyuid}   = $self->confirm_single_study($self->{dcminfo});
- 
+
 # getting an idea on what there is and breaking it down to different acquisitions
     $self->{acqu_AoH}   = [ $self->acquisition_AoH($self->{dcminfo}) ];  # Array of Hashes decsribing acquisition parameters for each file
     $self->{acqu_Sum}   = { $self->collapse($self->{acqu_AoH}) };        # hash table acquisition summary collapsed by unique acquisition definitions
     $self->{acqu_List}  = [ $self->acquisitions($self->{acqu_Sum}) ];    # acquisition Listing sorted by acquisition number to be used for summary
 
 # hash table containing all kind of patient and institution info
-    $self->{header}     = {}; 
+    $self->{header}     = {};
     $self->{header}     = $self->fill_header($self->{dcminfo});
-    
-# some more counts 
+
+# some more counts
     $self->{totalcount}        = $self->file_count();
     $self->{nondcmcount}       = $self->{totalcount} - $self->{dcmcount};
-    $self->{acquisition_count} = $self->acquistion_count();  
+    $self->{acquisition_count} = $self->acquistion_count();
     $self->{user}              = $ENV{'USER'};
 
     return $self;
 }
 
-=pod 
+=pod
 ################################################################################################
     Some useful things :
 ################################################################################################
@@ -79,7 +79,7 @@ sub database {
     my $dbh    = shift;
     my $meta   = shift;
     my $update = shift;
-    
+
     # these are only available if you run dicomTar
     my $tarType     = shift;
     my $tarLog      = shift;
@@ -98,20 +98,20 @@ sub database {
     my $success = undef;
     # check if this StudyUID is already in your database
     (my $query = <<QUERY) =~ s/\n/ /gm;
-      SELECT 
-        DicomArchiveID, 
-        CreateInfo, 
-        LastUpdate,     
-        CreatingUser, 
-        md5sumArchive 
-      FROM 
-        tarchive 
-      WHERE 
+      SELECT
+        DicomArchiveID,
+        CreateInfo,
+        LastUpdate,
+        CreatingUser,
+        md5sumArchive
+      FROM
+        tarchive
+      WHERE
         DicomArchiveID=?
 QUERY
     my $sth = $dbh->prepare($query);
     $sth->execute($self->{studyuid});
-    
+
     # if there is an entry get create info
     if($sth->rows > 0) {
 	my @row = $sth->fetchrow_array();
@@ -122,37 +122,38 @@ QUERY
 	    exit 33;
 	}
 	# do not allow to run diccomSummary with database option if the study has already been archived
-	elsif (!$Archivemd5 && $row[3] ne "") { 
+	elsif (!$Archivemd5 && $row[3] ne "") {
 	    print "\n\n PROBLEM: This study has already been archived. You can only re-archive it using dicomTar!\n";
 	    print " This is the information retained from the first time the study has been archived:\n $row[1]\n\n";
 	    exit 33; }
-	
+
     } else {
 	$update = 0;
     }
 
-    # INSERT or UPDATE 
+    # INSERT or UPDATE
     # get acquisition metadata
     my $sfile = "$self->{tmpdir}/$meta.meta";
     my $metacontent = &read_file($sfile);
-    
-    (my $common_query_part = <<QUERY) =~ s/\n/ /gm;  
-      tarchive SET  
-        DicomArchiveID = ?,       PatientName = ?,
-        PatientID = ?,            PatientDoB = ?,
-        PatientGender = ?,        DateAcquired = ?,
-        ScannerManufacturer = ?,  ScannerModel = ?,
-        ScannerSerialNumber = ?,  ScannerSoftwareVersion = ?,
-        CenterName = ?,           AcquisitionCount = ?,
-        NonDicomFileCount = ?,    DicomFileCount = ?,
-        CreatingUser = ?,         SourceLocation = ?,
-        sumTypeVersion = ?,       AcquisitionMetadata = ?,
+
+    (my $common_query_part = <<QUERY) =~ s/\n/ /gm;
+      tarchive SET
+        DicomArchiveID = ?,         PatientName = ?,
+        PatientID = ?,              PatientDoB = ?,
+        PatientGender = ?,          DateAcquired = ?,
+        ScannerManufacturer = ?,    ScannerModel = ?,
+        ScannerSerialNumber = ?,    ScannerSoftwareVersion = ?,
+        CenterName = ?,             AcquisitionCount = ?,
+        NonDicomFileCount = ?,      DicomFileCount = ?,
+        CreatingUser = ?,           SourceLocation = ?,
+        sumTypeVersion = ?,         AcquisitionMetadata = ?,
+        ReferringPhysicianName = ?, PerformingPhysicianName = ?,
         DateLastArchived = NOW()
 QUERY
 
     #-----------------------------------------------------------
     # Try to determine the creating user for the tarchive row
-    # to be inserted. This is done by finding the row in 
+    # to be inserted. This is done by finding the row in
     # the mri_upload table with the DecompressedLocation equal
     # to the $self->{dcmdir}. This is only done when the MRI
     # pipeline is run in auto launch mode: the creating user is
@@ -187,53 +188,55 @@ QUERY
         }
     }
 
-    my @values = 
+    my @values =
       (
-       $self->{studyuid},                 $self->{header}->{pname},           
-       $self->{header}->{pid},            $self->{header}->{birthdate},      
-       $self->{header}->{sex},            $self->{header}->{scandate},       
-       $self->{header}->{manufacturer},   $self->{header}->{scanner},          
-       $self->{header}->{scanner_serial}, $self->{header}->{software},      
-       $self->{header}->{institution},    $self->{acquisition_count},          
-       $self->{nondcmcount},              $self->{dcmcount},                  
-       $creating_user,                    $self->{dcmdir},                     
-       $self->{sumTypeVersion},           $metacontent   
+       $self->{studyuid},                        $self->{header}->{pname},
+       $self->{header}->{pid},                   $self->{header}->{birthdate},
+       $self->{header}->{sex},                   $self->{header}->{scandate},
+       $self->{header}->{manufacturer},          $self->{header}->{scanner},
+       $self->{header}->{scanner_serial},        $self->{header}->{software},
+       $self->{header}->{institution},           $self->{acquisition_count},
+       $self->{nondcmcount},                     $self->{dcmcount},
+       $self->{user},                            $self->{dcmdir},
+       $self->{sumTypeVersion},                  $metacontent,
+       $self->{header}->{referring_physician},   $self->{header}->{performing_physician}
       );
-    
+
     # this only applies if you are archiving your data
-    if ($Archivemd5) { 
-       ($common_query_part = <<QUERY) =~ s/\n/ /gm; 
-          $common_query_part,  tarTypeVersion = ?,  
-          md5sumArchive = ?,   md5sumDicomOnly = ?,  
-          ArchiveLocation = ?, CreateInfo = ? 
+    if ($Archivemd5) {
+       ($common_query_part = <<QUERY) =~ s/\n/ /gm;
+          $common_query_part,  tarTypeVersion = ?,
+          md5sumArchive = ?,   md5sumDicomOnly = ?,
+          ArchiveLocation = ?, CreateInfo = ?
 QUERY
-        my @new_vals = 
+        my @new_vals =
           (
-           $tarType, $Archivemd5, 
-           $DCMmd5,  $Archive, 
+           $tarType, $Archivemd5,
+           $DCMmd5,  $Archive,
            $tarLog
           );
         push(@values, @new_vals);
     }
 
-    if (!$update) { 
+    if (!$update) {
         ($query = <<QUERY) =~ s/\n/ /gm;
-          INSERT INTO 
-            $common_query_part, 
-            DateFirstArchived = NOW(), 
+          INSERT INTO
+            $common_query_part,
+            DateFirstArchived = NOW(),
             neurodbCenterName = ?
 QUERY
         push(@values, $neurodbCenterName);
-    } 
-    else {  
+    }
+    else {
         ($query = <<QUERY) =~ s/\n/ /gm;
-          UPDATE 
-            $common_query_part 
-          WHERE DicomArchiveID = ? 
+          UPDATE
+            $common_query_part
+          WHERE DicomArchiveID = ?
 QUERY
         push(@values, $self->{studyuid});
     }
-    
+
+
     $sth     = $dbh->prepare($query);
     $success = $sth->execute(@values);
 #FIXME
@@ -245,12 +248,12 @@ print "Failed running query: $query\n\n\n" unless $success;
         $tarchiveID = $dbh->{'mysql_insertid'};
     } else {
         (my $query = <<QUERY) =~ s/\n/ /gm;
-          SELECT 
-            TarchiveID 
-          FROM 
-            tarchive 
-          WHERE 
-            DicomArchiveID = ? 
+          SELECT
+            TarchiveID
+          FROM
+            tarchive
+          WHERE
+            DicomArchiveID = ?
             AND SourceLocation= ?
 QUERY
         my $sth = $dbh->prepare($query);
@@ -258,19 +261,19 @@ QUERY
         my @row = $sth->fetchrow_array();
         $tarchiveID = $row[0];
     }
-    
+
     # if update, nuke series and files records then reinsert them
     if($update) {
         (my $delete_series = <<QUERY) =~ s/\n/ /gm;
-          DELETE FROM 
-            tarchive_series 
-          WHERE 
+          DELETE FROM
+            tarchive_series
+          WHERE
             TarchiveID = ?
 QUERY
         (my $delete_files = <<QUERY) =~ s/\n/ /gm;
-          DELETE FROM 
-            tarchive_files 
-          WHERE 
+          DELETE FROM
+            tarchive_files
+          WHERE
             TarchiveID = ?
 QUERY
         my $sth_series = $dbh->prepare($delete_series);
@@ -281,52 +284,53 @@ QUERY
 
     # now create the tarchive_series records
     (my $query = <<QUERY) =~ s/\n/ /gm;
-      INSERT INTO 
-        tarchive_series 
+      INSERT INTO
+        tarchive_series
           (
-           TarchiveID,    SeriesNumber,   SeriesDescription, 
-           SequenceName,  EchoTime,       RepetitionTime, 
-           InversionTime, SliceThickness, PhaseEncoding, 
+           TarchiveID,    SeriesNumber,   SeriesDescription,
+           SequenceName,  EchoTime,       RepetitionTime,
+           InversionTime, SliceThickness, PhaseEncoding,
            NumberOfFiles, SeriesUID,      Modality
-          ) 
-        VALUES 
+          )
+        VALUES
           (
-           ?,             ?,              ?, 
-           ?,             ?,              ?, 
-           ?,             ?,              ?, 
+           ?,             ?,              ?,
+           ?,             ?,              ?,
+           ?,             ?,              ?,
            ?,             ?,              ?
           )
 QUERY
+
     my $insert_series = $dbh->prepare($query);
     foreach my $acq (@{$self->{acqu_List}}) {
 
         # insert the series
         my ($seriesNum, $sequName,  $echoT, $repT, $invT, $seriesName, $sl_thickness, $phaseEncode, $seriesUID, $modality, $num) = split(':::', $acq);
-        
-        #InversionTime may not be insert in the DICOM Header under certain sequences acquisitions  
+
+        #InversionTime may not be insert in the DICOM Header under certain sequences acquisitions
         if ($invT eq '') {
             $invT = undef;
         }
         if ($seriesName =~ /ColFA$/i) {
-            $echoT        = undef;    
+            $echoT        = undef;
             $repT         = undef;
             $sl_thickness = undef;
         }
         if ($modality eq 'MR') {
-            my @values = 
+            my @values =
               (
-               $tarchiveID, $seriesNum,    $seriesName, 
-               $sequName,   $echoT,        $repT, 
-               $invT,       $sl_thickness, $phaseEncode, 
+               $tarchiveID, $seriesNum,    $seriesName,
+               $sequName,   $echoT,        $repT,
+               $invT,       $sl_thickness, $phaseEncode,
                $num,        $seriesUID,    $modality
               );
             $insert_series->execute(@values);
         } elsif ($modality eq 'PT') {
-            my @values = 
+            my @values =
               (
-               $tarchiveID, $seriesNum,    $seriesName, 
-               undef,       undef,         undef, 
-               undef,       $sl_thickness, undef, 
+               $tarchiveID, $seriesNum,    $seriesName,
+               undef,       undef,         undef,
+               undef,       $sl_thickness, undef,
                $num,        $seriesUID,    $modality
               );
             $insert_series->execute(@values);
@@ -335,17 +339,17 @@ QUERY
 
     # now create the tarchive_files records
     (my $insert_query = <<QUERY) =~ s/\n/ /gm;
-      INSERT INTO 
-        tarchive_files 
+      INSERT INTO
+        tarchive_files
           (
-           TarchiveID, SeriesNumber,      FileNumber, 
-           EchoNumber, SeriesDescription, Md5Sum, 
+           TarchiveID, SeriesNumber,      FileNumber,
+           EchoNumber, SeriesDescription, Md5Sum,
            FileName,   TarchiveSeriesID
-          ) 
-        VALUES 
+          )
+        VALUES
           (
-           ?,          ?,                 ?, 
-           ?,          ?,                 ?, 
+           ?,          ?,                 ?,
+           ?,          ?,                 ?,
            ?,          ?
           )
 QUERY
@@ -362,24 +366,24 @@ QUERY
         my ($TarchiveSeriesID) = $select_TarchiveSeriesID->fetchrow_array();
         my @values;
         if($file->[21] && $file->[25] eq 'MR') { # file is dicom and an MRI scan
-            @values = 
+            @values =
               (
-               $tarchiveID, $file->[1],  $file->[3], 
-               $file->[2],  $file->[12], $file->[20], 
+               $tarchiveID, $file->[1],  $file->[3],
+               $file->[2],  $file->[12], $file->[20],
                $filename,   $TarchiveSeriesID
               );
         } elsif($file->[21] && $file->[25] eq 'PT') { # file is dicom and a PET scan
-            @values = 
+            @values =
               (
-               $tarchiveID, $file->[1],  $file->[3], 
-               undef,       $file->[12], $file->[20], 
+               $tarchiveID, $file->[1],  $file->[3],
+               undef,       $file->[12], $file->[20],
                $filename,   $TarchiveSeriesID
               );
         } else {
-            @values = 
+            @values =
               (
-               $tarchiveID, undef, undef, 
-               undef,       undef, $file->[20], 
+               $tarchiveID, undef, undef,
+               undef,       undef, $file->[20],
                $filename,   $TarchiveSeriesID
               );
         }
@@ -388,11 +392,11 @@ QUERY
     return $success; # if query worked this will return 1;
 }
 
-=pod 
+=pod
 ################################################
 Read file content into variable
 ################################################
-=cut    
+=cut
 sub read_file {
     my $file = shift;
     my $content;
@@ -436,7 +440,7 @@ sub dcm_count {
     else { return $count;}
 }
 
-=pod 
+=pod
 ################################################################################################
 Get acquisitions: Array of Hashes describing every file in terms of the acquisition
 ################################################################################################
@@ -447,20 +451,20 @@ sub acquisition_AoH {
     my $i = 0;
     # Generate an array of hashes.
     foreach my $info ( @{$self->{dcminfo}} ) {
-	    # create an array of hashes. Containing the protocol info for every file 
+	    # create an array of hashes. Containing the protocol info for every file
 	    if(@{$info}[21]) {
-	        $AoH[$i]  = { 
-                'seriesNum'     => @{$info}[1], 
-                'seriesName'    => @{$info}[12], 
-                'sl_thickness'  => @{$info}[18], 
+	        $AoH[$i]  = {
+                'seriesNum'     => @{$info}[1],
+                'seriesName'    => @{$info}[12],
+                'sl_thickness'  => @{$info}[18],
                 'seriesUID'     => @{$info}[24],
                 'modality'      => @{$info}[25]
 	        };
             if(@{$info}[25] eq "MR") {
-                $AoH[$i]->{'sequName'}    = @{$info}[17], 
+                $AoH[$i]->{'sequName'}    = @{$info}[17],
                 $AoH[$i]->{'echoN'}       = @{$info}[2],
-                $AoH[$i]->{'echoT'}       = @{$info}[6], 
-                $AoH[$i]->{'invT'}        = @{$info}[7], 
+                $AoH[$i]->{'echoT'}       = @{$info}[6],
+                $AoH[$i]->{'invT'}        = @{$info}[7],
                 $AoH[$i]->{'repT'}        = @{$info}[5],
                 $AoH[$i]->{'phaseEncode'} = @{$info}[19]
             } elsif (@{$info}[25] eq "PT") {
@@ -470,9 +474,9 @@ sub acquisition_AoH {
 	    }
     }
     return @AoH; # meaning array of hashes
-} 
+}
 
-=pod 
+=pod
 ################################################
 Collapse the AoH to get a summary of acquisitions
 ################################################
@@ -485,14 +489,14 @@ sub collapse {
     # go through array and get rid of duplicate elements
     foreach my $value ( @{$self->{acqu_AoH}} ) {
 	    # this should be the same for series that follow the dicom specs
-        my $common = join(':::', ($value->{'sequName'},     $value->{'seriesNum'}, 
-                                  $value->{'echoN'} 
+        my $common = join(':::', ($value->{'sequName'},     $value->{'seriesNum'},
+                                  $value->{'echoN'}
                                  )
                          );
-        my $now    = join(':::', ($value->{'seriesNum'},    $value->{'sequName'},  
-                                  $value->{'echoT'},        $value->{'repT'},      
-                                  $value->{'invT'},         $value->{'seriesName'}, 
-                                  $value->{'sl_thickness'}, $value->{'phaseEncode'}, 
+        my $now    = join(':::', ($value->{'seriesNum'},    $value->{'sequName'},
+                                  $value->{'echoT'},        $value->{'repT'},
+                                  $value->{'invT'},         $value->{'seriesName'},
+                                  $value->{'sl_thickness'}, $value->{'phaseEncode'},
                                   $value->{'seriesUID'},    $value->{'modality'}
                                  )
                          );
@@ -500,12 +504,12 @@ sub collapse {
 	    $i++;
 	    $hash{$common} = join(':::', $now, $i);
 	    $prev = $now;
-    } # end of foreach 
+    } # end of foreach
     # what we really want
     return %hash;
 } # end of function
 
-=pod 
+=pod
 ################################################
 Sort the Hash by acquisitions
 ################################################
@@ -521,21 +525,22 @@ sub acquisitions {
     # value which is the acquistion number. Will allow you to use perl -w
     @retarr = sort {$a <=> $b} (@retarr);
     return @retarr;
-    
+
 } # end of function
 
-=pod 
+=pod
 ################################################################################################
-Get dicom info from all files in a directory  
-Info: I added the -k5 on August 28th 2006 because the guys in Kupio assign 
-      duplicate FN SN EN values for scouts and subsequent scans    
+Get dicom info from all files in a directory
+Info: I added the -k5 on August 28th 2006 because the guys in Kupio assign
+      duplicate FN SN EN values for scouts and subsequent scans
 ################################################################################################
-=cut 
+=cut
 sub content_list {
     my ($self, $dcmdir) = @_;
-    my @info = (); 
+    my @info = ();
     my $find_handler = sub { if(-f $File::Find::name) { push @info, &read_dicom_data($File::Find::name); } };
     find($find_handler, $dcmdir);
+
     my @sorted_info = sort { ($b->[21] <=>  $a->[21])
 			  || ($a->[1]  <=>  $b->[1])
 			  || ($a->[5]  <=>  $b->[5])
@@ -543,8 +548,10 @@ sub content_list {
 			  || ($a->[2]  <=>  $b->[2])
 			  || ($a->[3]  <=>  $b->[3])
 			    } @info;
-    
+
     return @sorted_info;
+
+
 }
 
 =pod
@@ -558,49 +565,51 @@ sub read_dicom_data {
     # read the file, assuming it is dicom
     my $dicom = DICOM->new();
     my $fileIsDicom = ! ($dicom->fill($file));
-    
+
     #my $dicomTest          = trimwhitespace($dicom->value('0020','0032'));  # a basic test to exclude stupid pseudo dicom files
     my $studyUID           = trimwhitespace($dicom->value('0020','000D'));  # element 0 0 is study uid
     if($studyUID eq '') {$fileIsDicom = 0;}                              # element 0 21 is whether file is Dicom or not
 
-    my ($series,          $echo,           $image,              $tr,    
-        $te,              $ti,             $date,               $pname, 
-        $pdob,            $pid,            $series_description, $sex,
-        $scanner,         $software,       $institution,        $sequence,       
-        $slice_thickness, $phase_encoding, $manufacturer,       $scanner_serial, 
-        $seriesUID,       $modality
+    my ($series,          $echo,           $image,               $tr,
+        $te,              $ti,             $date,                $pname,
+        $pdob,            $pid,            $series_description,  $sex,
+        $scanner,         $software,       $institution,         $sequence,
+        $slice_thickness, $phase_encoding, $referring_physician, $performing_physician,
+        $manufacturer,    $scanner_serial, $seriesUID,           $modality
        );
 
     # see if the file was really dicom
     if($fileIsDicom) {
-	$studyUID           = trimwhitespace($dicom->value('0020','000D'));  # element 0 0 is study uid
-	$series             = trimwhitespace($dicom->value('0020','0011'));  # element 0 1 is series
-	$echo               = trimwhitespace($dicom->value('0018','0086'));  # element 0 2 is echo number
-	$image              = trimwhitespace($dicom->value('0020','0013'));  # element 0 3 is image number
-	                                                                     # element 0 4 is the file itself  
-	$tr                 = trimwhitespace($dicom->value('0018','0080'));  # element 0 5 is repetition time  
-	$te                 = trimwhitespace($dicom->value('0018','0081'));  # element 0 6 is echo time
-	$ti                 = trimwhitespace($dicom->value('0018','0082'));  # element 0 7 is inversion time
-	$date               = trimwhitespace($dicom->value('0008','0020'));  # element 0 8 is date of study
-	$pname              = trimwhitespace($dicom->value('0010','0010'));  # element 0 9 is patient name
-	$pdob               = trimwhitespace($dicom->value('0010','0030'));  # element 0 10 is patitent date of birth 
-	$pid                = trimwhitespace($dicom->value('0010','0020'));  # element 0 11 is patient ID
-	$series_description = trimwhitespace($dicom->value('0008','103E'));  # element 0 12 is series description
-	$sex                = trimwhitespace($dicom->value('0010','0040'));  # element 0 13 -attvalue 0010 0040    patient sex
-	$scanner            = trimwhitespace($dicom->value('0008','1090'));  # element 0 14 -attvalue 0008 1090    scanner model
-	$software           = trimwhitespace($dicom->value('0018','1020'));  # element 0 15 -attvalue 0018 1020    software version
-	$institution        = trimwhitespace($dicom->value('0008','0080'));  # element 0 16 -attvalue 0008 0080    institution
-	$sequence           = trimwhitespace($dicom->value('0018','0024'));  # element 0 17 -attvalue  0018 0024   sequence name
-	$slice_thickness    = trimwhitespace($dicom->value('0018','0050'));  # element 0 18 slice_thickness
-	$phase_encoding     = trimwhitespace($dicom->value('0018','1312'));  # element 0 19 phase encoding
+	  $studyUID            = trimwhitespace($dicom->value('0020','000D'));  # element 0 0 is study uid
+	  $series              = trimwhitespace($dicom->value('0020','0011'));  # element 0 1 is series
+	  $echo                = trimwhitespace($dicom->value('0018','0086'));  # element 0 2 is echo number
+	  $image               = trimwhitespace($dicom->value('0020','0013'));  # element 0 3 is image number
+	                                                                     # element 0 4 is the file itself
+	  $tr                  = trimwhitespace($dicom->value('0018','0080'));  # element 0 5 is repetition time
+	  $te                  = trimwhitespace($dicom->value('0018','0081'));  # element 0 6 is echo time
+	  $ti                  = trimwhitespace($dicom->value('0018','0082'));  # element 0 7 is inversion time
+	  $date                = trimwhitespace($dicom->value('0008','0020'));  # element 0 8 is date of study
+	  $pname               = trimwhitespace($dicom->value('0010','0010'));  # element 0 9 is patient name
+	  $pdob                = trimwhitespace($dicom->value('0010','0030'));  # element 0 10 is patitent date of birth
+	  $pid                 = trimwhitespace($dicom->value('0010','0020'));  # element 0 11 is patient ID
+	  $series_description  = trimwhitespace($dicom->value('0008','103E'));  # element 0 12 is series description
+	  $sex                 = trimwhitespace($dicom->value('0010','0040'));  # element 0 13 -attvalue 0010 0040    patient sex
+	  $scanner             = trimwhitespace($dicom->value('0008','1090'));  # element 0 14 -attvalue 0008 1090    scanner model
+	  $software            = trimwhitespace($dicom->value('0018','1020'));  # element 0 15 -attvalue 0018 1020    software version
+	  $institution         = trimwhitespace($dicom->value('0008','0080'));  # element 0 16 -attvalue 0008 0080    institution
+	  $sequence            = trimwhitespace($dicom->value('0018','0024'));  # element 0 17 -attvalue  0018 0024   sequence name
+	  $slice_thickness     = trimwhitespace($dicom->value('0018','0050'));  # element 0 18 slice_thickness
+	  $phase_encoding      = trimwhitespace($dicom->value('0018','1312'));  # element 0 19 phase encoding
+    $referring_physician  = trimwhitespace($dicom->value('0008','0090'));  # element 0 26 referring physician
+    $performing_physician = trimwhitespace($dicom->value('0008','1050'));  # element 0 27 performing physician (researcher)
 
     # these have been added only for tarchiveLoader functionality
     $manufacturer       = trimwhitespace($dicom->value('0008','0070'));  # element 0 22  scanner manufacturer
     $scanner_serial     = trimwhitespace($dicom->value('0018','1000'));  # element 0 23  scanner serial number
 
-	$seriesUID          = trimwhitespace($dicom->value('0020','000E'));  # element 0 24 is series uid
+	  $seriesUID          = trimwhitespace($dicom->value('0020','000E'));  # element 0 24 is series uid
     $modality           = trimwhitespace($dicom->value('0008','0060'));  # element 0 25 is modality (PT=PET, MR=MRI)
-    }    
+    }
     my @md5bits = split(' ', md5sum($file));                         # element 0 20 md5Sum
     my $md5 = $md5bits[0];
 
@@ -608,23 +617,23 @@ sub read_dicom_data {
     $tr = &Math::Round::nearest(0.01, $tr*1) unless (!defined($tr) || ($tr eq ""));
     $ti = &Math::Round::nearest(0.01, $ti*1) unless (!defined($ti) || ($ti eq ""));
     $slice_thickness = &Math::Round::nearest(0.01, $slice_thickness*1) unless (!defined($slice_thickness) || ($slice_thickness eq ""));
-    
-    return  [ $studyUID,           $series,      $echo,            $image, 
-              $file,               $tr,          $te,              $ti,   
-              $date,               $pname,       $pdob,            $pid,
-              $series_description, $sex,         $scanner,         $software, 
-              $institution,        $sequence,    $slice_thickness, $phase_encoding,
-              $md5,                $fileIsDicom, $manufacturer,    $scanner_serial,
-              $seriesUID,          $modality
+
+    return  [ $studyUID,            $series,       $echo,                $image,
+              $file,                $tr,           $te,                  $ti,
+              $date,                $pname,        $pdob,                $pid,
+              $series_description,  $sex,          $scanner,             $software,
+              $institution,         $sequence,     $slice_thickness,     $phase_encoding,
+              $md5,                 $fileIsDicom,  $manufacturer,        $scanner_serial,
+              $seriesUID,           $modality,     $referring_physician, $performing_physician,
             ];
 
 }
 
-=pod 
+=pod
 ################################################################################################
-fill header information reading the first valid dicom file 
+fill header information reading the first valid dicom file
 ################################################################################################
-=cut 
+=cut
 sub fill_header {
     my $self = shift;
     # fixme: this makes it more obvious to access array members
@@ -634,29 +643,31 @@ sub fill_header {
     while(! @{$head_info[$i]}[21]) {
 	$i++;
     }
-    $self->{header}->{pname}       = $head_info[$i]->[9];
-    $self->{header}->{pid}         = $head_info[$i]->[11];
-    $self->{header}->{birthdate}   = &date_format($head_info[$i]->[ 10]);
-    $self->{header}->{scandate}    = &date_format($head_info[$i]->[  8]);
-    $self->{header}->{sex}         = $head_info[$i]->[ 13 ];
-    $self->{header}->{scanner}     = $head_info[$i]->[ 14 ];
-    $self->{header}->{software}    = $head_info[$i]->[ 15 ];
-    $self->{header}->{institution} = $head_info[$i]->[ 16 ];
-    $self->{header}->{modality}    = $head_info[$i]->[ 25 ];
+    $self->{header}->{pname}                = $head_info[$i]->[9];
+    $self->{header}->{pid}                  = $head_info[$i]->[11];
+    $self->{header}->{birthdate}            = &date_format($head_info[$i]->[ 10]);
+    $self->{header}->{scandate}             = &date_format($head_info[$i]->[  8]);
+    $self->{header}->{sex}                  = $head_info[$i]->[ 13 ];
+    $self->{header}->{scanner}              = $head_info[$i]->[ 14 ];
+    $self->{header}->{software}             = $head_info[$i]->[ 15 ];
+    $self->{header}->{institution}          = $head_info[$i]->[ 16 ];
+    $self->{header}->{modality}             = $head_info[$i]->[ 25 ];
+    $self->{header}->{referring_physician}  = $head_info[$i]->[ 26 ];
+    $self->{header}->{performing_physician} = $head_info[$i]->[ 27 ];
 
 # these have been added for tarchiveLoader
     $self->{header}->{manufacturer}       = $head_info[$i]->[ 22 ];
-    $self->{header}->{scanner_serial}     = $head_info[$i]->[ 23 ];    
+    $self->{header}->{scanner_serial}     = $head_info[$i]->[ 23 ];
     return $self->{header};
 }
 
-=pod 
+=pod
 ################################################################################################
-Confirm only one study is in dir to be archived. returns False if there is more than one ID 
+Confirm only one study is in dir to be archived. returns False if there is more than one ID
 otherwise it returns that ID
 This is what I want : ". $self->{dcminfo}->[1][0] ."\n";#
 ################################################################################################
-=cut 
+=cut
 sub confirm_single_study {
     my $self = shift;
     my %hash;
@@ -669,13 +680,13 @@ sub confirm_single_study {
 		  }
 		  $i++;
     }
-    if(scalar(keys(%hash)) > 1) { 
-	print "\n\t ERROR: This class is designed around the notion of a \'Study\'.\n\t You can't use it with data from multiple studies. \n\nThe following study UIDs were found:\n"; 
+    if(scalar(keys(%hash)) > 1) {
+	print "\n\t ERROR: This class is designed around the notion of a \'Study\'.\n\t You can't use it with data from multiple studies. \n\nThe following study UIDs were found:\n";
 
 	foreach my $studyUID (keys(%hash)) {
 	    print "'$studyUID'\n";
 	}
-	exit 33; 
+	exit 33;
     }
     else {
 	my $studyid;
@@ -685,11 +696,11 @@ sub confirm_single_study {
 	return $studyid;
     }
 }
-=pod 
+=pod
 ################################################################################################################################################
 print HEADER see format below
 ################################################################################################################################################
-=cut 
+=cut
 sub print_header {
     my $self = shift;
     $self->format_head($self);
@@ -703,11 +714,11 @@ sub format_head {
     format FORMAT_HEADER =
 <STUDY_INFO>
 * Unique Study ID          :    @<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
-                                $self->{studyuid},                                
+                                $self->{studyuid},
 * Patient Name             :    @<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
                                 $self->{header}->{pname},
 * Patient ID               :    @<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
-                                $self->{header}->{pid},                                
+                                $self->{header}->{pid},
 * Patient date of birth    :    @<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
                                 $self->{header}->{birthdate},
 * Scan Date                :    @<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
@@ -722,15 +733,20 @@ sub format_head {
                                 $self->{header}->{institution},
 * Modality                 :    @<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
                                 $self->{header}->{modality}
+* PI                       :    @<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+                                $self->{header}->{referring_physician}
+* Researcher               :    @<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+                                $self->{header}->{performing_physician}
+
 </STUDY_INFO>
 .
 }
 
-=pod 
+=pod
 ################################################################################################################################################
 print CONTENT using formats below
 ################################################################################################################################################
-=cut 
+=cut
 sub print_content {
     my $self = shift;
     my @files = @{$self->{'dcminfo'}};
@@ -766,7 +782,7 @@ sub write_dcm {
     write();
 # <FILES>
     format FORMAT_FILE =
-@<<< | @<<<| @<<| @<<<<<<<<<<<<<<<<<<<<<<<<<< | @<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<| @<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<  
+@<<< | @<<<| @<<| @<<<<<<<<<<<<<<<<<<<<<<<<<< | @<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<| @<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 $$d[1], $$d[3],$$d[2],$$d[12],                  $$d[20],                            $$d[4]
 .
 # </FILES>
@@ -779,13 +795,13 @@ sub write_other {
     write();
 # <OTHER Files>
 format FORMAT_OTHER =
-----          Non DICOM File           ----   | @<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<| @<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<  
-                                                $$d[20],                           $$d[4]  
+----          Non DICOM File           ----   | @<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<| @<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+                                                $$d[20],                           $$d[4]
 .
 # </OTHER Files>
 }
 
-=pod 
+=pod
 ################################################################################################################################################
 print Acquisitions using formats below
 ################################################################################################################################################
@@ -794,7 +810,7 @@ sub print_acquisitions {
     my $self = shift;
     my @a = @{$self->{acqu_List}};
     &write_acqu_head();  # print the pseudo xml header
-    my $i = 0;    
+    my $i = 0;
     foreach my $value (@a) { # loop through the acquisition summary hash
 	&write_acqu_content($value);
 	$i++;
@@ -807,7 +823,7 @@ sub write_acqu_head {
     write();
     format ACQU_HEADER =
 <ACQUISITIONS>
-Series (SN) | Name of series                  | Seq Name        | echoT ms | repT ms  | invT ms  | sth mm | PhEnc | NoF            
+Series (SN) | Name of series                  | Seq Name        | echoT ms | repT ms  | invT ms  | sth mm | PhEnc | NoF
 .
 }
 ################################################ print aquisition types
@@ -822,7 +838,7 @@ $seriesNum,   $seriesName,                      $sequName,        $echoT,    $re
 .
 }
 
-=pod 
+=pod
 ################################################################################################################################################
 print footer using formats below
 ################################################################################################################################################
@@ -848,7 +864,7 @@ Age at scan             :   @<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 </SUMMARY>
 .
 }
-=pod 
+=pod
 ################################################################################################################################################
 PRINT THE WHOLE THING ! THIS IS WHAT YOU REALLY WANT
 ################################################################################################################################################
@@ -864,24 +880,24 @@ sub dcmsummary {
 }
 
 ######  unrelated but useful functions ########################################
-=pod 
+=pod
 ################################################
-Get rid of nasty whitespace 
+Get rid of nasty whitespace
 ################################################
-=cut    
+=cut
 sub trimwhitespace {
 	my $string = shift;
 	$string =~ s/^\s+//;
 	$string =~ s/\s+$//;
 	return $string;
 }
-=pod 
+=pod
 ################################################
 Pass it a date in YYYYMMDD and you get YYYY-MM-DD
 Pass it two of these and you get the difference
 in decimal and Y M +/- Days
 ################################################
-=cut 
+=cut
 sub date_format {
     my $first = $_[0];
     my $second = $_[1];
@@ -895,8 +911,8 @@ sub date_format {
 	my $diff = &Math::Round::nearest(0.01, ($Y + $M/12.0 + $D/365.0)*1) . " or $Y years, $M months $D days";
 	return $diff;
     }
-    $first =~ s/(....)(..)(..)/$1-$2-$3/; 
-    return $first; 
+    $first =~ s/(....)(..)(..)/$1-$2-$3/;
+    return $first;
 }
 
 
@@ -909,5 +925,5 @@ sub md5sum {
     open(FILE, $filename) or die "Can't open '$filename': $!";
     binmode(FILE);
     return Digest::MD5->new->addfile(*FILE)->hexdigest . "  $filename\n";
-} 
+}
 1;
