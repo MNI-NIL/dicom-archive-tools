@@ -150,6 +150,44 @@ QUERY
         ReferringPhysicianName = ?, PerformingPhysicianName = ?,
         DateLastArchived = NOW()
 QUERY
+
+    #-----------------------------------------------------------
+    # Try to determine the creating user for the tarchive row
+    # to be inserted. This is done by finding the row in 
+    # the mri_upload table with the DecompressedLocation equal
+    # to the $self->{dcmdir}. This is only done when the MRI
+    # pipeline is run in auto launch mode: the creating user is
+    # set to $ENV{'user'} otherwise (note that when the auto
+    # launch is turned on, $ENV{'USER'} will be '').
+    #-----------------------------------------------------------
+    my $creating_user = $self->{user};
+
+    # If we are in auto launch mode
+    if(length($creating_user) == 0) {
+        ($query = <<QUERY) =~ s/\n/ /gm;
+          SELECT UploadedBy
+          FROM mri_upload
+          WHERE DecompressedLocation = ?
+QUERY
+        # Lookup in the mri_upload table
+        $sth     = $dbh->prepare($query);
+        my @args = ($self->{dcmdir});
+        $success = $sth->execute(@args);
+        print "Failed running query: $query\n\n\n" unless $success;
+
+        # Fetch result
+        my @row = $sth->fetchrow_array();
+        if(@row == 0) {
+            print "No row in mri_upload table with DecompressedLocation = " . $self->{dcmdir} . "\n";
+            $creating_user = undef;
+        } elsif(@row > 1) {
+            print "More than one row in mri_upload table with DecompressedLocation = " . $self->{dcmdir} . "\n";
+            $creating_user = undef;
+        } else {
+            $creating_user = $row[0];
+        }
+    }
+
     my @values = 
       (
        $self->{studyuid},                        $self->{header}->{pname},           
@@ -306,15 +344,17 @@ QUERY
           (
            TarchiveID, SeriesNumber,      FileNumber, 
            EchoNumber, SeriesDescription, Md5Sum, 
-           FileName
+           FileName,   TarchiveSeriesID
           ) 
         VALUES 
           (
            ?,          ?,                 ?, 
            ?,          ?,                 ?, 
-           ?
+           ?,          ?
           )
 QUERY
+    my $query_select_TarchiveSeriesID = "SELECT TarchiveSeriesID FROM tarchive_series WHERE SeriesUID = ? AND EchoTime= ?";
+    my $select_TarchiveSeriesID = $dbh->prepare($query_select_TarchiveSeriesID);
     my $insert_file = $dbh->prepare($insert_query);
     my $dcmdirRoot = dirname($self->{dcmdir});
     foreach my $file (@{$self->{'dcminfo'}}) {
@@ -322,27 +362,29 @@ QUERY
         my $filename = $file->[4];
         $filename =~ s/^${dcmdirRoot}\///;
         $file->[2] = undef if($file->[2] eq '');
+        $select_TarchiveSeriesID->execute($file->[24], $file->[6]); # based on SeriesUID and EchoTime
+        my ($TarchiveSeriesID) = $select_TarchiveSeriesID->fetchrow_array();
         my @values;
         if($file->[21] && $file->[25] eq 'MR') { # file is dicom and an MRI scan 
             @values = 
               (
                $tarchiveID, $file->[1],  $file->[3], 
                $file->[2],  $file->[12], $file->[20], 
-               $filename
+               $filename,   $TarchiveSeriesID
               );
         } elsif($file->[21] && $file->[25] eq 'PT') { # file is dicom and a PET scan
             @values = 
               (
                $tarchiveID, $file->[1],  $file->[3], 
                undef,       $file->[12], $file->[20], 
-               $filename
+               $filename,   $TarchiveSeriesID
               );
         } else {
             @values = 
               (
                $tarchiveID, undef, undef, 
                undef,       undef, $file->[20], 
-               $filename
+               $filename,   $TarchiveSeriesID
               );
         }
         $insert_file->execute(@values);

@@ -82,10 +82,17 @@ $QCed2_step   =   'INTERLACE_outputDWIFileNameSuffix';
 # -----------------------------------------------------------------------------------------------
 =cut
 
-sub getIncomingDir {
-    my $site = shift;
-    return $tarchiveLibraryDir;
+### This gets the modalities that SNR is to be computed on
+## Filename base usually contains the modality
+## So compute SNR on the 3-D modalities; most commonly t1, t2, flair, and pd
+sub getSNRModalities {
+    my $base = shift;
+    if ($base =~ /t1/i or $base =~ /t2/i or $base =~ /flair/i or $base =~ /pd/i) {
+        return 1;
+    }
+    return 0;
 }
+
 # extracts the subject and timepoint identifiers from the patient name 
 # assumes identifers are stored as <PSCID>_<DCCID>_<visit> in PatientName field, where <visit> is 3 digits.
 sub getSubjectIDs {
@@ -165,10 +172,10 @@ sub filterParameters {
 # ----------- OPTIONAL SUBROUTINE
 # Fetch site, CandID and Visit info from DTI folder.
 sub  get_DTI_Site_CandID_Visit {
-    my ($dir) =   @_;
+    my ($native_dir) =   @_;
 
-    if  ($dir =~  /\/*([0-9]+)\/([N,P][A,R][P,E]EN00)/i)  {   # when only one site
-        my  $site   =   "PreventAD";                                  # when only one site
+    if  ($native_dir =~  /assembly\/(\d\d\d\d\d\d)\/(V\d{1,2})\/mri\//i)  {  
+        my  $site   =   $prefix;                          
         my  $subjID =   $1;
         my  $visit  =   $2;
         return  ($site,$subjID,$visit);
