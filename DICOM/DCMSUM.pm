@@ -197,7 +197,7 @@ QUERY
        $self->{header}->{scanner_serial},        $self->{header}->{software},
        $self->{header}->{institution},           $self->{acquisition_count},
        $self->{nondcmcount},                     $self->{dcmcount},
-       $self->{user},                            $self->{dcmdir},
+       $creating_user,                           $self->{dcmdir},
        $self->{sumTypeVersion},                  $metacontent,
        $self->{header}->{referring_physician},   $self->{header}->{performing_physician}
       );
