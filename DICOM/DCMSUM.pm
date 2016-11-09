@@ -236,9 +236,9 @@ QUERY
         push(@values, $self->{studyuid});
     }
 
-
     $sth     = $dbh->prepare($query);
     $success = $sth->execute(@values);
+
 #FIXME
 print "Failed running query: $query\n\n\n" unless $success;
 
@@ -300,7 +300,6 @@ QUERY
            ?,             ?,              ?
           )
 QUERY
-
     my $insert_series = $dbh->prepare($query);
     foreach my $acq (@{$self->{acqu_List}}) {
 
@@ -343,18 +342,16 @@ QUERY
         tarchive_files
           (
            TarchiveID, SeriesNumber,      FileNumber,
-           EchoNumber, SeriesDescription, Md5Sum,
-           FileName,   TarchiveSeriesID
-          )
-        VALUES
+           EchoNumber, SeriesDescription, Md5Sum, 
+           FileName
+          ) 
+        VALUES 
           (
-           ?,          ?,                 ?,
-           ?,          ?,                 ?,
-           ?,          ?
+           ?,          ?,                 ?, 
+           ?,          ?,                 ?, 
+           ?
           )
 QUERY
-    my $query_select_TarchiveSeriesID = "SELECT TarchiveSeriesID FROM tarchive_series WHERE SeriesUID = ? AND EchoTime= ?";
-    my $select_TarchiveSeriesID = $dbh->prepare($query_select_TarchiveSeriesID);
     my $insert_file = $dbh->prepare($insert_query);
     my $dcmdirRoot = dirname($self->{dcmdir});
     foreach my $file (@{$self->{'dcminfo'}}) {
@@ -362,29 +359,27 @@ QUERY
         my $filename = $file->[4];
         $filename =~ s/^${dcmdirRoot}\///;
         $file->[2] = undef if($file->[2] eq '');
-        $select_TarchiveSeriesID->execute($file->[24], $file->[6]); # based on SeriesUID and EchoTime
-        my ($TarchiveSeriesID) = $select_TarchiveSeriesID->fetchrow_array();
         my @values;
         if($file->[21] && $file->[25] eq 'MR') { # file is dicom and an MRI scan
             @values =
               (
-               $tarchiveID, $file->[1],  $file->[3],
-               $file->[2],  $file->[12], $file->[20],
-               $filename,   $TarchiveSeriesID
+               $tarchiveID, $file->[1],  $file->[3], 
+               $file->[2],  $file->[12], $file->[20], 
+               $filename
               );
         } elsif($file->[21] && $file->[25] eq 'PT') { # file is dicom and a PET scan
             @values =
               (
                $tarchiveID, $file->[1],  $file->[3],
-               undef,       $file->[12], $file->[20],
-               $filename,   $TarchiveSeriesID
+               undef,       $file->[12], $file->[20], 
+               $filename
               );
         } else {
             @values =
               (
                $tarchiveID, undef, undef,
-               undef,       undef, $file->[20],
-               $filename,   $TarchiveSeriesID
+               undef,       undef, $file->[20], 
+               $filename
               );
         }
         $insert_file->execute(@values);
@@ -550,8 +545,6 @@ sub content_list {
 			    } @info;
 
     return @sorted_info;
-
-
 }
 
 =pod
@@ -570,12 +563,12 @@ sub read_dicom_data {
     my $studyUID           = trimwhitespace($dicom->value('0020','000D'));  # element 0 0 is study uid
     if($studyUID eq '') {$fileIsDicom = 0;}                              # element 0 21 is whether file is Dicom or not
 
-    my ($series,          $echo,           $image,               $tr,
-        $te,              $ti,             $date,                $pname,
-        $pdob,            $pid,            $series_description,  $sex,
-        $scanner,         $software,       $institution,         $sequence,
-        $slice_thickness, $phase_encoding, $referring_physician, $performing_physician,
-        $manufacturer,    $scanner_serial, $seriesUID,           $modality
+    my ($series,          $echo,           $image,              $tr,
+        $te,              $ti,             $date,               $pname, 
+        $pdob,            $pid,            $series_description, $sex,
+        $scanner,         $software,       $institution,        $sequence,       
+        $slice_thickness, $phase_encoding, $manufacturer,       $scanner_serial, 
+        $seriesUID,       $modality
        );
 
     # see if the file was really dicom
@@ -600,8 +593,9 @@ sub read_dicom_data {
 	  $sequence            = trimwhitespace($dicom->value('0018','0024'));  # element 0 17 -attvalue  0018 0024   sequence name
 	  $slice_thickness     = trimwhitespace($dicom->value('0018','0050'));  # element 0 18 slice_thickness
 	  $phase_encoding      = trimwhitespace($dicom->value('0018','1312'));  # element 0 19 phase encoding
-    $referring_physician  = trimwhitespace($dicom->value('0008','0090'));  # element 0 26 referring physician
-    $performing_physician = trimwhitespace($dicom->value('0008','1050'));  # element 0 27 performing physician (researcher)
+      $referring_physician  = trimwhitespace($dicom->value('0008','0090'));  # element 0 26 referring physician
+      $performing_physician = trimwhitespace($dicom->value('0008','1050'));  # element 0 27 performing physician (researcher)
+
 
     # these have been added only for tarchiveLoader functionality
     $manufacturer       = trimwhitespace($dicom->value('0008','0070'));  # element 0 22  scanner manufacturer
@@ -624,7 +618,7 @@ sub read_dicom_data {
               $series_description,  $sex,          $scanner,             $software,
               $institution,         $sequence,     $slice_thickness,     $phase_encoding,
               $md5,                 $fileIsDicom,  $manufacturer,        $scanner_serial,
-              $seriesUID,           $modality,     $referring_physician, $performing_physician,
+              $seriesUID,           $modality,     $referring_physician, $performing_physician
             ];
 
 }
@@ -643,17 +637,15 @@ sub fill_header {
     while(! @{$head_info[$i]}[21]) {
 	$i++;
     }
-    $self->{header}->{pname}                = $head_info[$i]->[9];
-    $self->{header}->{pid}                  = $head_info[$i]->[11];
-    $self->{header}->{birthdate}            = &date_format($head_info[$i]->[ 10]);
-    $self->{header}->{scandate}             = &date_format($head_info[$i]->[  8]);
-    $self->{header}->{sex}                  = $head_info[$i]->[ 13 ];
-    $self->{header}->{scanner}              = $head_info[$i]->[ 14 ];
-    $self->{header}->{software}             = $head_info[$i]->[ 15 ];
-    $self->{header}->{institution}          = $head_info[$i]->[ 16 ];
-    $self->{header}->{modality}             = $head_info[$i]->[ 25 ];
-    $self->{header}->{referring_physician}  = $head_info[$i]->[ 26 ];
-    $self->{header}->{performing_physician} = $head_info[$i]->[ 27 ];
+    $self->{header}->{pname}       = $head_info[$i]->[9];
+    $self->{header}->{pid}         = $head_info[$i]->[11];
+    $self->{header}->{birthdate}   = &date_format($head_info[$i]->[ 10]);
+    $self->{header}->{scandate}    = &date_format($head_info[$i]->[  8]);
+    $self->{header}->{sex}         = $head_info[$i]->[ 13 ];
+    $self->{header}->{scanner}     = $head_info[$i]->[ 14 ];
+    $self->{header}->{software}    = $head_info[$i]->[ 15 ];
+    $self->{header}->{institution} = $head_info[$i]->[ 16 ];
+    $self->{header}->{modality}    = $head_info[$i]->[ 25 ];
 
 # these have been added for tarchiveLoader
     $self->{header}->{manufacturer}       = $head_info[$i]->[ 22 ];
@@ -733,11 +725,6 @@ sub format_head {
                                 $self->{header}->{institution},
 * Modality                 :    @<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
                                 $self->{header}->{modality}
-* PI                       :    @<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
-                                $self->{header}->{referring_physician}
-* Researcher               :    @<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
-                                $self->{header}->{performing_physician}
-
 </STUDY_INFO>
 .
 }
@@ -925,5 +912,5 @@ sub md5sum {
     open(FILE, $filename) or die "Can't open '$filename': $!";
     binmode(FILE);
     return Digest::MD5->new->addfile(*FILE)->hexdigest . "  $filename\n";
-}
+} 
 1;
